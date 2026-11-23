@@ -1,0 +1,50 @@
+%% 实践课2 模块依赖关系图（使用方 → 被依赖方）
+%% 可粘贴到 https://mermaid.live 或 draw.io / Typora 编辑
+graph BT
+    subgraph L1["基础层"]
+        telemetry
+        schema
+    end
+    subgraph L2["框架层"]
+        tui
+        codemode
+        mcp
+        chord
+    end
+    subgraph L3["能力层"]
+        ai
+        agent
+        durable
+        env
+    end
+    subgraph L4["应用层"]
+        coding-agent
+    end
+
+    chord --> schema
+    chord --> telemetry
+    ai --> schema
+    ai --> telemetry
+    agent --> ai
+    agent --> schema
+    durable --> chord
+    durable --> ai
+    durable --> codemode
+    durable --> schema
+    durable --> telemetry
+    env --> chord
+    env --> durable
+    coding-agent --> agent
+    coding-agent --> ai
+    coding-agent --> codemode
+    coding-agent --> mcp
+    coding-agent --> tui
+
+    classDef base fill:#dbeafe,stroke:#3b82f6
+    classDef frame fill:#dcfce7,stroke:#22c55e
+    classDef cap fill:#fef9c3,stroke:#eab308
+    classDef app fill:#fee2e2,stroke:#ef4444
+    class telemetry,schema base
+    class tui,codemode,mcp,chord frame
+    class ai,agent,durable,env cap
+    class coding-agent app
