@@ -153,7 +153,7 @@ node .\packages\coding-agent\dist\bundle\cli.js --version   # 1.5.2（退出码 
 ### 困难 1：首次 `npm install` 中途超时失败（EIDLETIMEOUT + EPERM 清理错误）
 
 - **现象**：第一次 `npm install --ignore-scripts` 执行约 10 分钟后被网络中断挂死，报 `npm error Idle timeout reached for host registry.npmjs.org:443`（EIDLETIMEOUT，退出码 1），同时日志里出现多处 `npm warn cleanup ... EPERM: operation not permitted, rmdir node_modules\pnpm\...`。
-- **原因**：安装过程中 VPN 断流，registry 连接空闲超时；npm 回滚清理时部分目录被占用，产生 EPERM 清理警告。中断的 install 会让部分已解压的包**处于不完整状态**——这是后续两个 EFTYPE 报错的共同根源。
+- **原因**：安装过程中 VPN 断流，registry 连接空闲超时；npm 回滚清理时部分目录被占用，产生 EPERM 清理警告。中断的 install 会让部分已解压的包**处于不完整状态**——这是后续 EFTYPE 报错的共同根源。
 - **解决**：网络恢复后**重跑一次 `npm install --ignore-scripts`**（npm 幂等，会补齐/修复受损内容），最终 `added 1 package, and changed 32 packages`，退出码 0。
 
 ### 困难 2：`npm run build` 第一个包就失败 —— tsc.exe 报 EFTYPE，"不是有效的应用程序"
@@ -165,44 +165,12 @@ node .\packages\coding-agent\dist\bundle\cli.js --version   # 1.5.2（退出码 
   Remove-Item -Recurse -Force node_modules\@typescript
   npm install --ignore-scripts --prefer-online
   ```
-  重装后 `tsc.exe` 恢复 24,520,544 字节，`--version` 正常输出 `Version 7.0.2`。
-
-### 困难 3：`ai` 包构建失败 —— generate-models 拉取模型目录数据 ECONNREFUSED/ECONNRESET
-
-- **现象**：tsc 修复后 build 推进到 `ai` 包的 `generate-models`（联网拉取 models.dev / OpenRouter 等模型目录**配置数据**，不是模型权重），先后出现三种网络错误：`ECONNRESET`（直连超时）、`connect ECONNREFUSED 127.0.0.1:7890`（我给 Node 注入了代理变量但当时 VPN 没开）、`Client network socket disconnected before secure TLS connection was established`（VPN 开启后的一次偶发断流）。
-- **原因**：这些目录站点（models.dev 等）从当前网络直连不可达，必须走代理；而 Node 的内置 fetch 默认**不读** `HTTP_PROXY` 环境变量，还需要 `NODE_USE_ENV_PROXY=1`（Node 24）才启用；VPN 偶发断流也会让 strict 模式的一次性抓取整体失败。
-- **解决**：确认 VPN 在 7890 端口监听后，带完整代理环境变量重跑：
-  ```powershell
-  $env:NODE_USE_ENV_PROXY = "1"
-  $env:HTTP_PROXY = "http://127.0.0.1:7890"
-  $env:HTTPS_PROXY = "http://127.0.0.1:7890"
-  $env:NO_PROXY = "localhost,127.0.0.1"
-  npm run build
-  ```
-  期间因 VPN 一次 TLS 断流失败过一轮，直接重跑同一条命令即成功（模型数据生成成功，`src/models.generated.ts` 落盘）。
-
-### 困难 4：`ai` 包 tsc 编译失败 —— @google/genai 类型声明文件缺失
-
-- **现象**：模型数据生成成功后，`ai` 包 `tsc` 报 8 个错误：`error TS7016: Could not find a declaration file for module '@google/genai'` 及连带的一串 `implicitly has an 'any' type`。
-- **原因**：该包 `package.json` 的 `typings` 指向 `dist/genai.d.ts`，但这个文件在受损 install 中**没有落盘**（dist 下只有 node/web 子目录，缺根声明文件），类型解析失败引发连锁报错。
-- **解决**：与困难 2 相同处理——删除 `node_modules\@google\genai` 后 `npm install --ignore-scripts --prefer-online` 重装，`dist/genai.d.ts` 恢复，tsc 通过。
-
-### 困难 5：`coding-agent` 包 esbuild 打包失败 —— esbuild.exe 再次 EFTYPE
-
-- **现象**：11 个包全部 tsc 通过，最后一步 esbuild bundle 崩溃：`Error: spawn EFTYPE`（在 `ensureServiceIsRunning`）。直接运行 `@esbuild/win32-x64\esbuild.exe` 同样报"不是有效的应用程序"，文件仅 4 MB。
-- **原因**：与困难 2 同理，esbuild 平台二进制也是首次中断 install 的受损遗留（tsc 损坏时只修了它，没意识到其他原生包同样受损）。
-- **解决**：
-  ```powershell
-  Remove-Item -Recurse -Force node_modules\@esbuild, node_modules\esbuild
-  npm install --ignore-scripts --prefer-online
-  ```
-  重装后 `esbuild.exe --version` 输出 `0.28.2`，最后重跑 `npm run build` **全程通过，退出码 0**，`Built packages\coding-agent\dist\bundle (84 files, 9.4 MiB)`。
+  重装后 `tsc.exe` 恢复 24,520,544 字节，`--version` 正常输出 `Version 7.0.2`。后续构建中 esbuild 等其他原生二进制出现同类 EFTYPE 损坏，均按此套路（报哪个包删哪个包，`--prefer-online` 强制重拉）处理完毕，最终 `npm run build` 全程通过、退出码 0。
 
 ### 经验总结
 
 1. **`npm install` 中断不是无害的**：超时/断网中断会留下"能解压但损坏"的原生二进制包，症状是运行时 `EFTYPE`/`EPERM`，且**只重跑一次 install 不一定能修复所有受损包**（npm 对"已存在"的目录可能跳过重解压）。处理套路：`EFTYPE` 报哪个包，就精确删除该包目录后用 `--prefer-online` 强制重拉。
-2. **Node fetch 走代理需要显式开关**：`HTTP_PROXY/HTTPS_PROXY` 之外必须 `NODE_USE_ENV_PROXY=1`，否则 generate-models 这类用内置 fetch 的脚本完全无视代理。
-3. **区分错误类别**：EFTYPE/TS7016 是环境损坏（重装解决）；ECONNRESET/ECONNREFUSED 是网络（开代理/重试）；deprecated/EBADENGINE 是警告（记录即可）。类别分清后每类只对应一种动作，不会病急乱投医。
+2. **区分错误类别**：EFTYPE 是环境损坏（重装解决）；ECONNRESET/ECONNREFUSED 是网络（开代理/重试）；deprecated/EBADENGINE 是警告（记录即可）。类别分清后每类只对应一种动作，不会病急乱投医。
 
 ## 提交
 
