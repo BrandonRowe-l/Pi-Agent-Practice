@@ -171,8 +171,3 @@ node .\packages\coding-agent\dist\bundle\cli.js --version   # 1.5.2（退出码 
 
 1. **`npm install` 中断不是无害的**：超时/断网中断会留下"能解压但损坏"的原生二进制包，症状是运行时 `EFTYPE`/`EPERM`，且**只重跑一次 install 不一定能修复所有受损包**（npm 对"已存在"的目录可能跳过重解压）。处理套路：`EFTYPE` 报哪个包，就精确删除该包目录后用 `--prefer-online` 强制重拉。
 2. **区分错误类别**：EFTYPE 是环境损坏（重装解决）；ECONNRESET/ECONNREFUSED 是网络（开代理/重试）；deprecated/EBADENGINE 是警告（记录即可）。类别分清后每类只对应一种动作，不会病急乱投医。
-
-## 提交
-
-- 报告与截图：本仓库 `practice-03/` 目录
-- Issue 名称：`实践课3：Pi Agent源码安装与编译 BrandonRowe`
