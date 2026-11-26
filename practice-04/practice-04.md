@@ -1,10 +1,10 @@
 # 实践课4：Pi Agent 模型调用与运行流程
 
-> 源码仓库：`https://github.com/System-Analysis-Homework/pi-hunnu-2026`（提交编号 `c3cc91632d0a1950fb122605b190233f2aa0006e`，与实践课 3 一致）
+> 源码仓库：`https://github.com/System-Analysis-Homework/pi-hunnu-2026`
 
 ## 一、源码修改
 
-在 `packages/agent/src/agent-loop.ts` 中加入两行 `console.error` 日志。本小组版本行号与教师演示版一致（原 284 行、原 412 行）。
+在 `packages/agent/src/agent-loop.ts` 中加入两行 `console.error` 日志（插入位置分别在第 284 行、第 412 行附近）。
 
 `git diff` 实际改动：
 
@@ -58,7 +58,7 @@ diff --git a/packages/agent/src/agent-loop.ts b/packages/agent/src/agent-loop.ts
 [P4] Agent 即将请求模型
 ```
 
-共 **1 条**，仅一轮模型调用；无「工具结果已加入上下文」，说明模型直接生成答案，Agent 循环未进入工具执行分支。
+共 **1 条**，仅一轮模型调用；无「工具结果已加入上下文」，模型直接生成答案。
 - **最终回复**：「Git 分支是一条指向某次提交的可移动指针，让你能在不影响主线的情况下独立开发和试验。」
 
 ![S5 会话 A 直接问答](./assets/S5-session-a.png)
@@ -89,8 +89,8 @@ diff --git a/packages/agent/src/agent-loop.ts b/packages/agent/src/agent-loop.ts
 | "工具结果已加入上下文"条数 | 0 | 1 |
 | 模型调用轮数 | 1 轮 | 2 轮 |
 
-- **谁实际读了文件**：不是 Agent 循环本身，也不是模型——是 Agent 循环执行的 `read` 工具读到了文件。模型只生成了"调用 read 工具"的决定，真正访问文件系统的是工具执行层。
-- **下一轮模型请求多带了什么**：多带了一条 `toolResult` 消息（即 read 工具返回的文件内容，经 `currentContext.messages.push(result)` 加入上下文），模型因此能读到实验代号并作答。
+- **谁实际读了文件**：Agent 循环执行的 `read` 工具读到了文件。模型只生成了"调用 read 工具"的决定，真正访问文件系统的是工具执行层。
+- **下一轮模型请求多带了什么**：多带了一条 `toolResult` 消息（read 工具返回的文件内容，经 `currentContext.messages.push(result)` 加入上下文），模型据此读到实验代号并作答。
 
 ### 运行流程简图
 
@@ -113,5 +113,4 @@ diff --git a/packages/agent/src/agent-loop.ts b/packages/agent/src/agent-loop.ts
 ## 四、总结
 
 - Agent 循环以「模型调用 →（可选）工具执行 → 结果写回上下文 → 再模型调用」运转；每轮模型调用前打印一次"即将请求模型"，每条工具结果入上下文打印一次"工具结果已加入上下文"。
-- 直接问答 1 轮结束；读文件任务因工具调用多走一轮，日志顺序 `即将请求模型 → 工具结果已加入上下文 → 即将请求模型`，与实践课文档给出的典型顺序一致。
-- 两行日志把 agent 包中原本不可见的循环边界显式化了，是观察 Agent 运行时行为最直接的切入点。
+- 直接问答 1 轮结束；读文件任务因工具调用多走一轮，日志顺序 `即将请求模型 → 工具结果已加入上下文 → 即将请求模型`。
