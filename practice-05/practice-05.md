@@ -1,9 +1,5 @@
 # 实践课5：Pi Agent 工具调用与会话恢复
 
-> 源码仓库：`https://github.com/System-Analysis-Homework/pi-hunnu-2026`
-> 本组随机标识：`river-731`（写入 `handoff.txt`，提问中未透露命令）
-> 本地构建启动：`node .\packages\coding-agent\dist\cli.js`（1.5.2，DeepSeek deepseek-flash · low）
-
 ## A. 单轮交互与 read 工具调用
 
 在项目根目录创建 `handoff.txt`，写入两行：
